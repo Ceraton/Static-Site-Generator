@@ -1,4 +1,4 @@
-
+from textnode import TextNode, TextType
 
 class HTMLNode():
     def __init__(self, tag=None, value=None, children=None, props=None):
@@ -29,7 +29,7 @@ class HTMLNode():
     
 
 class LeafNode(HTMLNode):
-    def __init__(self, tag=None, value=None, props=None):
+    def __init__(self, tag, value, props=None):
         super().__init__(tag, value, None, props)
         self.tag = tag
         self.value = value
@@ -45,8 +45,16 @@ class LeafNode(HTMLNode):
     def props_to_html(self):
         if not self.props:
             return ""
-        else:
-            return f"href={self.props["href"]} target={self.props["target"]}"
+        if "href" in self.props:
+            if self.props["href"] and not self.props["target"]:
+                return f"href={self.props["href"]}"
+            else:
+                return f"href={self.props["href"]} target={self.props["target"]}"
+        if "src" in self.props:
+            if self.props["src"] and not self.props["alt"]:
+                return f"img={self.props["src"]}"
+            else:
+                return f"img={self.props["src"]} alt={self.props["alt"]}"
 
     def __repr__(self):
         return f"LeafNode({self.tag}, {self.value}, {self.props})"
@@ -65,9 +73,24 @@ class ParentNode(HTMLNode):
             raise ValueError("Missing children")
         result = f"<{self.tag}{self.props_to_html()}>"
         for child in self.children  :
-            #if child.value is None:
-                #raise ValueError("Missing Children")
             result += child.to_html()
         
         result += f"</{self.tag}>"
         return result
+    
+def text_node_to_html_node(text_node):
+    match text_node.text_type:
+        case TextType.TEXT:
+            return LeafNode(None, text_node.text)
+        case TextType.BOLD:
+            return LeafNode("b", text_node.text)
+        case TextType.ITALIC:
+            return LeafNode("i", text_node.text)
+        case TextType.CODE:
+            return LeafNode("code", text_node.text)
+        case TextType.LINK:
+            return LeafNode("a", text_node.text, {"href": text_node.url})
+        case TextType.IMAGE:
+            return LeafNode("img", "", {"src": text_node.url, "alt": text_node.text})
+        case _:
+            raise ValueError(f"Invalid text type: {text_node.text_type}")
