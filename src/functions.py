@@ -1,6 +1,16 @@
 from htmlnode import HTMLNode, ParentNode, LeafNode
 from textnode import TextNode, TextType
+
 import re
+from enum import Enum
+
+class BlockType(Enum):
+    PARAGRAPH = "paragraph"
+    HEADING = "heading"
+    CODE = "code"
+    QUOTE = "quote"
+    UNORDEREDLIST = "unordered_list"
+    ORDEREDLIST = "ordered_list"
 
 def text_node_to_html_node(text_node):
     match text_node.text_type:
@@ -120,3 +130,112 @@ def text_to_textnodes(text):
     nodes = split_nodes_link(nodes)
 
     return nodes
+
+def markdown_to_blocks(markdown):
+    blocks = markdown.split("\n\n")
+    blocks = [block.strip() for block in blocks]
+    blocks = [block for block in blocks if block != ""]
+    return blocks
+
+def block_to_block_type(block):
+    if re.match(r"^#{1,6} ", block):
+        return BlockType.HEADING
+    
+    if block.startswith("```") and block.endswith("```"):
+        return BlockType.CODE
+    
+    lines = block.split("\n")
+    if all(line.startswith(">") for line in lines):
+        return BlockType.QUOTE
+    
+    if all(line.startswith("- ") for line in lines):
+        return BlockType.UNORDEREDLIST
+    
+    is_ordered = True
+    for i, line in enumerate(lines):
+        if not line.startswith(f"{i + 1}. "):
+            is_ordered = False
+            break
+
+    if is_ordered:
+        return BlockType.ORDEREDLIST
+    
+    return BlockType.PARAGRAPH
+    
+def markdown_to_html_node(markdown):
+    blocks = markdown_to_blocks(markdown)
+    children = []
+
+    for block in blocks:
+        children.append(block_to_html_node(block))
+    return ParentNode("div", children)
+
+def block_to_html_node(block):
+    block_type = block_to_block_type(block)
+    match block_type:
+        case BlockType.HEADING:
+            return heading_to_html_node(block)
+        case BlockType.CODE:
+            return code_to_html_node(block)
+        case BlockType.QUOTE:
+            return quote_to_html_node(block)
+        case BlockType.UNORDEREDLIST:
+            return unordered_list_to_html_node(block)
+        case BlockType.ORDEREDLIST:
+            return ordered_list_to_html_node(block)
+        case BlockType.PARAGRAPH:
+            return paragraph_to_html_node(block)
+        case _:
+            raise ValueError(f"Unknown block type: {block_type}")
+
+def text_to_children(text):
+    text_nodes = text_to_textnodes(text)
+    return [text_node_to_html_node(node) for node in text_nodes]
+
+def heading_to_html_node(block):
+    level = 0
+    for char in block:
+        if char == "#":
+            level += 1
+        else:
+            break
+    text = block[level + 1:]
+    return ParentNode(f"h{level}", text_to_children(text))
+
+def code_to_html_node(block):
+    lines = block.split("\n")
+
+    content_lines = lines[1:-1]
+
+    stripped = [line.strip() for line in content_lines]
+    text = "\n".join(stripped) + "\n"
+    return ParentNode("pre", [LeafNode("code", text)])
+
+def quote_to_html_node(block):
+    lines = block.split("\n")
+    stripped = [line.lstrip(">").strip() for line in lines]
+    text = " ".join(stripped)
+    return ParentNode("blockquote", text_to_children(text))
+
+def unordered_list_to_html_node(block):
+    lines = block.split("\n")
+    items = [ParentNode("li", text_to_children(line[2:])) for line in lines]
+    return ParentNode("ul", items)
+
+def ordered_list_to_html_node(block):
+    lines = block.split("\n")
+    items = [ParentNode("li", text_to_children(line.split(". ", 1)[1])) for line in lines]
+    return ParentNode("ol", items)
+
+def paragraph_to_html_node(block):
+    lines = block.split("\n")
+    text = " ".join(line.strip() for line in lines)
+    return ParentNode("p", text_to_children(text))
+
+def extract_title(markdown):
+    lines = markdown.split("\n")
+    for line in lines:
+        if line.startswith("# "):
+            return line[2:].strip()
+    raise Exception("Missing header")
+

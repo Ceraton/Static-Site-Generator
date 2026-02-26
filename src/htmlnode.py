@@ -12,8 +12,10 @@ class HTMLNode():
     def props_to_html(self):
         if not self.props:
             return ""
-        else:
-            return f"href={self.props["href"]} target={self.props["target"]}"
+        result = ""
+        for key, value in self.props.items():
+            result += f' {key}="{value}"'
+        return result
     
     def __eq__(self, other):
         return (
@@ -41,16 +43,10 @@ class LeafNode(HTMLNode):
     def props_to_html(self):
         if not self.props:
             return ""
-        if "href" in self.props:
-            if self.props["href"] and not self.props["target"]:
-                return f"href={self.props["href"]}"
-            else:
-                return f"href={self.props["href"]} target={self.props["target"]}"
-        if "src" in self.props:
-            if self.props["src"] and not self.props["alt"]:
-                return f"img={self.props["src"]}"
-            else:
-                return f"img={self.props["src"]} alt={self.props["alt"]}"
+        result = ""
+        for key, value in self.props.items():
+            result += f' {key}="{value}"'
+        return result
 
     def __repr__(self):
         return f"LeafNode({self.tag}, {self.value}, {self.props})"
