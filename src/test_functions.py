@@ -2,7 +2,7 @@ import unittest
 
 from htmlnode import HTMLNode, LeafNode, ParentNode
 from textnode import TextNode, TextType
-from functions import text_node_to_html_node, split_nodes_delimiter
+from functions import *
 
 class TestFunctions(unittest.TestCase):
     def test_text(self):
@@ -66,4 +66,89 @@ class TestSplitDelimiter(unittest.TestCase):
         self.assertEqual(
             len(new_nodes),
             3
-        )        
+        )
+
+class TestMarkdownExtraction(unittest.TestCase):
+    def test_extract_markdown_images(self):
+        # 1. Basic test with two images
+        text = "This is text with an ![image](https://i.imgur.com/zceBglk.png) and ![another](https://i.imgur.com/df9jS9.png)"
+        matches = extract_markdown_images(text)
+        self.assertEqual(
+            matches, 
+            [("image", "https://i.imgur.com/zceBglk.png"), ("another", "https://i.imgur.com/df9jS9.png")]
+        )
+
+    def test_extract_markdown_links(self):
+        # 2. Basic test with two links
+        text = "This is text with a [link](https://www.google.com) and [another](https://www.example.com)"
+        matches = extract_markdown_links(text)
+        self.assertEqual(
+            matches, 
+            [("link", "https://www.google.com"), ("another", "https://www.example.com")]
+        )
+
+    def test_extract_links_ignores_images(self):
+        # 3. Ensure links extractor ignores image syntax (the '!') 
+        # Your regex in image_cf295a.png uses a negative lookbehind (?<!!) to handle this!
+        text = "This has a [link](https://google.com) and an ![image](https://i.imgur.com/zceBglk.png)"
+        matches = extract_markdown_links(text)
+        self.assertEqual(matches, [("link", "https://google.com")])
+
+    def test_extract_images_ignores_links(self):
+        # 4. Ensure images extractor ignores plain links
+        text = "This has a [link](https://google.com) and an ![image](https://i.imgur.com/zceBglk.png)"
+        matches = extract_markdown_images(text)
+        self.assertEqual(matches, [("image", "https://i.imgur.com/zceBglk.png")])
+
+    def test_extract_markdown_images(self):
+        matches = extract_markdown_images(
+            "This is text with an ![image](https://i.imgur.com/zjjcJKZ.png)"
+        )
+        self.assertListEqual([("image", "https://i.imgur.com/zjjcJKZ.png")], matches)   
+
+class TestSplitNodes(unittest.TestCase):
+    def test_split_image(self):
+        node = TextNode(
+            "This is text with an ![image](https://i.imgur.com/zceBglk.png)",
+            TextType.TEXT,
+        )
+        new_nodes = split_nodes_image([node])
+        self.assertListEqual(
+            [
+                TextNode("This is text with an ", TextType.TEXT),
+                TextNode("image", TextType.IMAGE, "https://i.imgur.com/zceBglk.png"),
+            ],
+            new_nodes,
+        )
+
+    def test_split_image_multiple(self):
+        node = TextNode(
+            "![first](https://link1.png) middle ![second](https://link2.png) end",
+            TextType.TEXT,
+        )
+        new_nodes = split_nodes_image([node])
+        self.assertListEqual(
+            [
+                TextNode("first", TextType.IMAGE, "https://link1.png"),
+                TextNode(" middle ", TextType.TEXT),
+                TextNode("second", TextType.IMAGE, "https://link2.png"),
+                TextNode(" end", TextType.TEXT),
+            ],
+            new_nodes,
+        )
+
+    def test_split_link_multiple(self):
+        node = TextNode(
+            "Click [here](https://google.com) and [there](https://bing.com)",
+            TextType.TEXT,
+        )
+        new_nodes = split_nodes_link([node])
+        self.assertListEqual(
+            [
+                TextNode("Click ", TextType.TEXT),
+                TextNode("here", TextType.LINK, "https://google.com"),
+                TextNode(" and ", TextType.TEXT),
+                TextNode("there", TextType.LINK, "https://bing.com"),
+            ],
+            new_nodes,
+        )
